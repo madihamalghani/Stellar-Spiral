@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy with Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+                "jsm/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "jsm/controls/OrbitControls.js";
+
+        // === Scene, Camera, Renderer ===
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 10, 25); // Position the camera away from the center of the galaxy
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // === Controls ===
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.25;
+        controls.screenSpacePanning = false;
+        controls.maxPolarAngle = Math.PI / 2; // Restrict vertical movement
+
+        // === Lighting ===
+        const ambientLight = new THREE.AmbientLight(0x404040, 1); // Ambient light to illuminate the scene
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100); // Point light to simulate sun-like effect
+        scene.add(pointLight);
+
+        // === Galaxy Parameters ===
+        const params = {
+            count: 5000, // Total stars
+            radius: 15, // Galaxy radius
+            branches: 6, // Number of spiral arms
+            spin: 1, // Spiral tightness
+            randomness: 1.5, // Spread of stars
+            starColor: 0xffffff, // White stars
+        };
+
+        // === Galaxy Geometry and Material ===
+        let galaxyGeometry;
+        let galaxyMaterial;
+        let galaxyPoints;
+
+        // Function to generate the galaxy
+        function generateGalaxy() {
+            // Remove previous galaxy (if any)
+            if (galaxyPoints) {
+                galaxyGeometry.dispose();
+                galaxyMaterial.dispose();
+                scene.remove(galaxyPoints);
+            }
+
+            // Geometry and Attributes
+            galaxyGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(params.count * 3); // x, y, z per star
+            const colors = new Float32Array(params.count * 3); // Color per star
+
+            for (let i = 0; i < params.count; i++) {
+                const branchAngle = ((i % params.branches) / params.branches) * Math.PI * 2; // Branch angle
+                const distance = Math.random() * params.radius; // Distance from center
+
+                // Randomness
+                const randomX = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * params.randomness;
+                const randomY = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * params.randomness;
+                const randomZ = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * params.randomness;
+
+                // Position
+                const i3 = i * 3;
+                positions[i3] = Math.cos(branchAngle + distance * params.spin) * distance + randomX;
+                positions[i3 + 1] = randomY;
+                positions[i3 + 2] = Math.sin(branchAngle + distance * params.spin) * distance + randomZ;
+
+                // Color
+                colors[i3] = 1;
+                colors[i3 + 1] = Math.random() * 0.5 + 0.5;
+                colors[i3 + 2] = Math.random() * 0.8 + 0.2;
+            }
+
+            // Set attributes
+            galaxyGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+            galaxyGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+            // Material
+            galaxyMaterial = new THREE.PointsMaterial({
+                size: 0.05,
+                vertexColors: true, // Enable vertex colors
+                blending: THREE.AdditiveBlending, // Glow effect
+                transparent: true,
+            });
+
+            // Points (Stars)
+            galaxyPoints = new THREE.Points(galaxyGeometry, galaxyMaterial);
+            scene.add(galaxyPoints);
+        }
+
+        // Initial galaxy generation
+        generateGalaxy();
+
+        // === Animate Galaxy ===
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Slowly rotate the galaxy
+            if (galaxyPoints) galaxyPoints.rotation.y += 0.001;
+
+            // Update controls and render
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // === Window Resize Handling ===
+        window.addEventListener("resize", () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>
